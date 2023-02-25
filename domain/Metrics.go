@@ -26,7 +26,7 @@ type MetricsSetDto struct {
 	PingerInterval int64   `json:"pinger_interval_ms" validate:"numeric"`
 }
 type NetworkSwitchSettingsDTO struct {
-	NetworkSwitchMode string `json:"network_switch_mode"`
+	NetworkSwitchMode string `json:"network_switch_mode" validate:"eq=main|eq=auto|eq=reserve,required"`
 }
 
 // PacketLossCount

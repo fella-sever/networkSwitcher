@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"net/http"
 	"networkSwitcher/domain"
 	"os/exec"
@@ -14,6 +15,7 @@ import (
 func main() {
 	//networkSwitchModeChan := make(chan string, 2)
 	var set domain.MetricsCount
+	validate := validator.New()
 	// задаем дефолтное значение параметров запуска утилиты
 	set.RttSettings = 80               // предел задержки по сети
 	set.PacketLossSettings = 60        // предел потери пакетов
@@ -30,7 +32,7 @@ func main() {
 
 	// запуск сервера
 	go func() {
-		r.GET("/", func(c *gin.Context) {
+		r.GET("/get_info", func(c *gin.Context) {
 			c.JSON(http.StatusOK, set)
 		})
 		r.POST("/set_threshold", func(c *gin.Context) {
@@ -51,9 +53,15 @@ func main() {
 			if err := c.BindJSON(&networkSwitchMode); err != nil {
 				return
 			}
-			set.NetworkSwitchMode = networkSwitchMode.NetworkSwitchMode
-			c.IndentedJSON(http.StatusAccepted,
-				"network mode: "+set.NetworkSwitchMode)
+			errs := validate.Struct(&networkSwitchMode)
+			if errs != nil {
+				c.IndentedJSON(http.StatusBadRequest, "bad validation:")
+			} else {
+				set.NetworkSwitchMode = networkSwitchMode.NetworkSwitchMode
+				c.IndentedJSON(http.StatusAccepted,
+					"network mode: "+set.NetworkSwitchMode)
+			}
+
 		})
 		r.Run()
 		wg.Done()
