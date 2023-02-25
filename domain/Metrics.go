@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"fmt"
 	"net"
 	"sync"
 	"time"
@@ -42,17 +43,23 @@ func (m *MetricsCount) CheckPacketLossRttThreshold(rtt chan time.Duration,
 	return nil
 }
 
-func (m *MetricsCount) CheckInterfaceIsAlive(interfaceName string) (bool, error) {
+func (m *MetricsCount) CheckInterfaceIsAlive(interfaceName string) error {
 	interfaces, err := net.Interfaces()
 	if err != nil {
-		return false, err
+		return fmt.Errorf("check interface is alive: %w", err)
 	}
 	for _, val := range interfaces {
-		if interfaceName == val.Name {
-			return true, nil
+		if val.Name == interfaceName && interfaceName == "main" {
+			m.AliveMainNetwork = true
+			break
+		}
+
+		if val.Name == interfaceName && interfaceName == "reserve" {
+			m.AliveReserveNetwork = true
+			break
 		}
 	}
-	return false, nil
+	return nil
 }
 
 func IpTablesSwitchMain() error {

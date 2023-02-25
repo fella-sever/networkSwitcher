@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"log"
 	"net/http"
 	"networkSwitcher/domain"
 	"os/exec"
@@ -14,9 +15,20 @@ import (
 
 func main() {
 	//networkSwitchModeChan := make(chan string, 2)
+
+	// начальная проверка интерфейсов
 	var set domain.MetricsCount
+	interfaceErr := set.CheckInterfaceIsAlive("main")
+	if interfaceErr != nil {
+		log.Println("check interfaces: ", interfaceErr)
+	}
+	interfaceErr = set.CheckInterfaceIsAlive("reserve")
+	if interfaceErr != nil {
+		log.Println("check interfaces: ", interfaceErr)
+	}
+	// валидатор для роутов
 	validate := validator.New()
-	// задаем дефолтное значение параметров запуска утилиты
+	// дефолтное значение параметров запуска утилиты
 	set.RttSettings = 80               // предел задержки по сети
 	set.PacketLossSettings = 60        // предел потери пакетов
 	set.PingerCount = 10               // сколько пакетов надо плюнуть
@@ -83,17 +95,20 @@ func main() {
 			if err != nil {
 				fmt.Println(err)
 			}
-			//fmt.Println(string(splittedPacketLossRow[2]))
-			finalPackeLoss, lossErr := strconv.Atoi(string(
+			finalPacketLoss, lossErr := strconv.Atoi(string(
 				splittedPacketLossRow[2][1]))
 			if err != nil {
 				fmt.Println(lossErr)
 			}
 			set.Rtt = finalRtt
-			set.PacketLoss = finalPackeLoss * 10
+			set.PacketLoss = finalPacketLoss * 10
 
 		}
 		wg.Done()
+	}()
+	// переключатель сети
+	go func() {
+
 	}()
 
 	wg.Wait()
