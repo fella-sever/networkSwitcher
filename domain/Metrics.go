@@ -1,56 +1,45 @@
 package domain
 
 import (
-	"fmt"
-	"github.com/go-ping/ping"
 	"net"
+	"sync"
 	"time"
 )
 
 type MetricsCount struct {
-	RttSettings         string  `json:"rtt_settings"`
-	PacketLossSettings  float64 `json:"packet_loss_settings"`
-	Rtt                 string  `json:"rtt"`
-	PacketLoss          float64 `json:"packet_loss"`
-	AliveMainNetwork    bool    `json:"alive_main_network"`
-	AliveReserveNetwork bool    `json:"alive_reserve_network"`
+	RttSettings float64 `json:"rtt_settings"` // настройки ртт,
+	// которые задает пользователь (в милисекундах)
+	PacketLossSettings  float64 `json:"packet_loss_settings_percent"` // настройки потери пакетов, которые задает пользователь (в пакетах)
+	Rtt                 float64 `json:"rtt_ms"`                       // реальный показатель ртт
+	PacketLoss          int     `json:"packet_loss_percent"`          // реальный показатель потерянных пакетов
+	AliveMainNetwork    bool    `json:"alive_main_network"`           // состояние основного сетевого интерфейса
+	AliveReserveNetwork bool    `json:"alive_reserve_network"`        // состояние резервного сетевого интерфейса
+	PingerCount         int     `json:"pinger_count"`                 // настройки количества пакетов при тестировании сети (пользователь)
+	PingerInterval      int64   `json:"pinger_interval_ms"`           // настройки интервалов пинга (пользователь)
+	NetworkSwitchMode   string  `json:"network_switch_mode"`          // настройки режима переключения сети
 }
 
 type MetricsSetDto struct {
-	RttSettings string  `json:"rtt_settings" validate:"required, numeric"`
-	PacketLoss  float64 `json:"packet_loss" validate:"required"`
+	RttSettings    float64 `json:"rtt_settings_ms" validate:"required"`
+	PacketLoss     float64 `json:"packet_loss_percent" validate:"required"`
+	PingerCount    int     `json:"pinger_count"`
+	PingerInterval int64   `json:"pinger_interval_ms" validate:"numeric"`
+}
+type NetworkSwitchSettingsDTO struct {
+	NetworkSwitchMode string `json:"network_switch_mode"`
 }
 
 // PacketLossCount
 // функция для подсчета
-func (m *MetricsCount) PacketLossRttCount() error {
-	pinger, err := ping.NewPinger("www.google.com")
-	if err != nil {
-		return err
-	}
-	pinger.Count = 10
-	pinger.Interval = time.Millisecond * 20
-	err = pinger.Resolve()
-	err = pinger.Run()
-	if err != nil {
-		return nil
-	}
-	m.Rtt = pinger.Statistics().AvgRtt.String()
-	m.PacketLoss = pinger.Statistics().PacketLoss
+func (m *MetricsCount) NetworkCheckService(rtt chan time.Duration, packetLoss chan float64, mu sync.RWMutex) error {
+
 	return nil
 }
 
-func (m *MetricsCount) CheckPacketLossRttThreshold() error {
-	swCount := 1
-	for {
-		if m.Rtt > m.RttSettings && m.PacketLoss > m.PacketLossSettings && swCount == 0 {
-			fmt.Println("switch to reserve network")
-			swCount++
-		} else if m.Rtt < m.RttSettings && swCount == 1 {
-			fmt.Println("switch to main network")
-			swCount--
-		}
-	}
+func (m *MetricsCount) CheckPacketLossRttThreshold(rtt chan time.Duration,
+	packetLoss chan float64, swCount *int) error {
+
+	return nil
 }
 
 func (m *MetricsCount) CheckInterfaceIsAlive(interfaceName string) (bool, error) {
@@ -64,4 +53,17 @@ func (m *MetricsCount) CheckInterfaceIsAlive(interfaceName string) (bool, error)
 		}
 	}
 	return false, nil
+}
+
+func IpTablesSwitchMain() error {
+	return nil
+}
+
+func IpTablesSwitchReseve() error {
+	return nil
+}
+
+func (m *MetricsCount) SetNetworkSwitchMode() error {
+
+	return nil
 }
