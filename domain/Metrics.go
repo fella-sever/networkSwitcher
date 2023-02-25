@@ -3,7 +3,6 @@ package domain
 import (
 	"fmt"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -12,7 +11,7 @@ type MetricsCount struct {
 	// которые задает пользователь (в милисекундах)
 	PacketLossSettings  float64 `json:"packet_loss_settings_percent"` // настройки потери пакетов, которые задает пользователь (в пакетах)
 	Rtt                 float64 `json:"rtt_ms"`                       // реальный показатель ртт
-	PacketLoss          int     `json:"packet_loss_percent"`          // реальный показатель потерянных пакетов
+	PacketLoss          float64 `json:"packet_loss_percent"`          // реальный показатель потерянных пакетов
 	AliveMainNetwork    bool    `json:"alive_main_network"`           // состояние основного сетевого интерфейса
 	AliveReserveNetwork bool    `json:"alive_reserve_network"`        // состояние резервного сетевого интерфейса
 	PingerCount         int     `json:"pinger_count"`                 // настройки количества пакетов при тестировании сети (пользователь)
@@ -28,13 +27,6 @@ type MetricsSetDto struct {
 }
 type NetworkSwitchSettingsDTO struct {
 	NetworkSwitchMode string `json:"network_switch_mode" validate:"eq=main|eq=auto|eq=reserve,required"`
-}
-
-// PacketLossCount
-// функция для подсчета
-func (m *MetricsCount) NetworkCheckService(rtt chan time.Duration, packetLoss chan float64, mu sync.RWMutex) error {
-
-	return nil
 }
 
 func (m *MetricsCount) CheckPacketLossRttThreshold(rtt chan time.Duration,
@@ -63,14 +55,37 @@ func (m *MetricsCount) CheckInterfaceIsAlive(interfaceName string) error {
 }
 
 func IpTablesSwitchMain() error {
+	fmt.Println("switched to main")
 	return nil
 }
 
 func IpTablesSwitchReseve() error {
+	fmt.Println("switched to reserve")
 	return nil
 }
 
-func (m *MetricsCount) SetNetworkSwitchMode() error {
+func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
+	packetLossCount chan float64) error {
+	switchCount := 1
+
+	for {
+		rttCountInner := <-rttCount
+		<-packetLossCount
+		if m.NetworkSwitchMode != "auto" {
+			break
+		}
+		if rttCountInner > m.RttSettings && switchCount == 0 {
+			switchCount++
+			if err := IpTablesSwitchReseve(); err != nil {
+				return fmt.Errorf("auto switch err: %w", err)
+			}
+		} else if rttCountInner < m.RttSettings && switchCount == 1 {
+			switchCount--
+			if err := IpTablesSwitchMain(); err != nil {
+				return fmt.Errorf("auto switch err: %w", err)
+			}
+		}
+	}
 
 	return nil
 }
