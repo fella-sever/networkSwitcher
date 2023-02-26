@@ -16,7 +16,12 @@ import (
 
 func main() {
 	var log = logrus.New()
-	log.Out = os.Stdout
+	logFile, createLogerr := os.OpenFile("networkSwitcherLog.txt",
+		os.O_CREATE|os.O_APPEND|os.O_RDWR, 0777)
+	if createLogerr != nil {
+		fmt.Println(createLogerr)
+	}
+	log.Out = logFile
 	// переключалка сети - устанавливает режим работы свитчера в зависимости от того
 	// что выбрал пользователь в эндпоинте. Ниже по дефолту в канал пишется "auto"
 	// для работы свитчера в режиме авто по умолчанию
