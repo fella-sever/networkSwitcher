@@ -88,47 +88,47 @@ func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 	for {
 		rttCountInner := <-rttCount
 		packetLOssInner := <-packetLossCount
-		if m.NetworkSwitchMode != "auto" {
-			break
+
+		if m.NetworkSwitchMode == "auto" {
+			if rttCountInner > m.RttSettings && switchCount == 0 {
+				switchCount++
+				if !IsReserve {
+					if err := m.IpTablesSwitchReserve(); err != nil {
+						return fmt.Errorf("auto switch err: %w", err)
+					}
+					IsReserve = true
+					IsMain = false
+				}
+			} else if rttCountInner < m.RttSettings && switchCount == 1 {
+				switchCount--
+				if !IsMain {
+					if err := m.IpTablesSwitchMain(); err != nil {
+						return fmt.Errorf("auto switch err: %w", err)
+					}
+					IsMain = true
+					IsReserve = false
+				}
+			}
+			if packetLOssInner > m.PacketLossSettings && switchCountPacket == 0 {
+				switchCountPacket++
+				if !IsReserve {
+					if err := m.IpTablesSwitchReserve(); err != nil {
+						return fmt.Errorf("auto switch err: %w", err)
+					}
+					IsReserve = true
+					IsMain = false
+				}
+			} else if packetLOssInner <= m.PacketLossSettings && switchCountPacket == 1 {
+				switchCountPacket--
+				if !IsMain {
+					if err := m.IpTablesSwitchMain(); err != nil {
+						return fmt.Errorf("auto switch err: %w", err)
+					}
+					IsMain = true
+					IsReserve = false
+				}
+			}
 		}
-		if rttCountInner > m.RttSettings && switchCount == 0 {
-			switchCount++
-			if !IsReserve {
-				if err := m.IpTablesSwitchReserve(); err != nil {
-					return fmt.Errorf("auto switch err: %w", err)
-				}
-				IsReserve = true
-				IsMain = false
-			}
-		} else if rttCountInner < m.RttSettings && switchCount == 1 {
-			switchCount--
-			if !IsMain {
-				if err := m.IpTablesSwitchMain(); err != nil {
-					return fmt.Errorf("auto switch err: %w", err)
-				}
-				IsMain = true
-				IsReserve = false
-			}
-		}
-		if packetLOssInner > m.PacketLossSettings && switchCountPacket == 0 {
-			switchCountPacket++
-			if !IsReserve {
-				if err := m.IpTablesSwitchReserve(); err != nil {
-					return fmt.Errorf("auto switch err: %w", err)
-				}
-				IsReserve = true
-				IsMain = false
-			}
-		} else if packetLOssInner <= m.PacketLossSettings && switchCountPacket == 1 {
-			switchCountPacket--
-			if !IsMain {
-				if err := m.IpTablesSwitchMain(); err != nil {
-					return fmt.Errorf("auto switch err: %w", err)
-				}
-				IsMain = true
-				IsReserve = false
-			}
-		}
+		return nil
 	}
-	return nil
 }
