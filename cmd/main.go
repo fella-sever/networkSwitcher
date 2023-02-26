@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"log"
+	"github.com/sirupsen/logrus"
 	"net/http"
 	"networkSwitcher/domain"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -14,6 +15,8 @@ import (
 )
 
 func main() {
+	var log = logrus.New()
+	log.Out = os.Stdout
 	// переключалка сети - устанавливает режим работы свитчера в зависимости от того
 	// что выбрал пользователь в эндпоинте. Ниже по дефолту в канал пишется "auto"
 	// для работы свитчера в режиме авто по умолчанию
@@ -45,6 +48,7 @@ func main() {
 	set.PingerInterval = 20        // за какое время это пакеты на выплюнуть
 	set.NetworkSwitchMode = "auto" // автоматический режим переключения сети по умолчанию
 	networkModeChan <- "auto"
+	log.Infof("starting with default parameters")
 	wg := sync.WaitGroup{}
 	wg.Add(4)
 	// запуск сервера
@@ -69,6 +73,10 @@ func main() {
 			set.PingerCount = newSettings.PingerCount
 			set.PingerInterval = newSettings.PingerInterval
 			c.IndentedJSON(http.StatusCreated, set)
+			log.Infof("changed thresholds: packetLoss settings - %0.2f,"+
+				"rtt settings - %0.2f, pinger count - %d, pinger interval - %d",
+				newSettings.PacketLoss, newSettings.RttSettings,
+				newSettings.PingerCount, newSettings.PingerInterval)
 
 		})
 		// выбор режима сети
@@ -80,17 +88,23 @@ func main() {
 			errs := validate.Struct(&networkSwitchMode)
 			if errs != nil {
 				c.IndentedJSON(http.StatusBadRequest, "bad validation:")
+				log.Infof("bad validation of network: %s",
+					networkSwitchMode.NetworkSwitchMode)
 			} else {
 				set.NetworkSwitchMode = networkSwitchMode.NetworkSwitchMode
 				networkModeChan <- networkSwitchMode.NetworkSwitchMode
 				c.IndentedJSON(http.StatusAccepted,
 					"network mode: "+set.NetworkSwitchMode)
+				log.Infof("network mode switcher by user: %s",
+					set.NetworkSwitchMode)
 			}
 
 		})
 		err := r.Run()
 		if err != nil {
 			log.Panicf("failed to start server: %s", err)
+		} else {
+			log.Infof("server started")
 		}
 		wg.Done()
 	}()
@@ -129,17 +143,20 @@ func main() {
 		for {
 			switch <-networkModeChan {
 			case "auto":
+				log.Info("user switched to auto")
 				err := set.NetworkAutoSwitch(rttCurrent, packetLossCurrent)
 				if err != nil {
 					fmt.Println("autoSwitch err: ", err)
 				}
 			case "reserve":
-				err := domain.IpTablesSwitchReserve()
+				log.Info("user switched to reserve")
+				err := set.IpTablesSwitchReserve()
 				if err != nil {
 					fmt.Println("switch to reserve iptables mode err: ", err)
 				}
 			case "main":
-				err := domain.IpTablesSwitchMain()
+				log.Info("user switched to main")
+				err := set.IpTablesSwitchMain()
 				if err != nil {
 					fmt.Println("switch to reserve iptables mode err: ", err)
 				}

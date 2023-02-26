@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"net"
 )
 
@@ -53,18 +54,20 @@ func (m *MetricsCount) CheckInterfaceIsAlive(interfaceName string) error {
 // IpTablesSwitchMain
 // запуск заранее подготовленного скрипта для очистки таблиц маршрутизации и
 // загрузки новых под основную сеть
-func IpTablesSwitchMain() error {
+func (m *MetricsCount) IpTablesSwitchMain() error {
 	// TODO implement me!
-	fmt.Println("switched to main")
+	logrus.Infof("switched to main with rtt: %0.2f, packetloss: %0.2f\n",
+		m.Rtt, m.PacketLoss)
 	return nil
 }
 
 // IpTablesSwitchReserve
 // запуск заранее подготовленного скрипта для очистки таблиц маршрутизации и
 // загрузки новых под резервную сеть
-func IpTablesSwitchReserve() error {
+func (m *MetricsCount) IpTablesSwitchReserve() error {
 	// TODO implement me!
-	fmt.Println("switched to reserve")
+	logrus.Infof("switched to reserve with rtt: %0.2f, packetloss: %0.2f\n",
+		m.Rtt, m.PacketLoss)
 	return nil
 }
 
@@ -81,6 +84,7 @@ func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 	switchCountPacket := 1
 	IsMain := false
 	IsReserve := false
+
 	for {
 		rttCountInner := <-rttCount
 		packetLOssInner := <-packetLossCount
@@ -90,7 +94,7 @@ func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 		if rttCountInner > m.RttSettings && switchCount == 0 {
 			switchCount++
 			if !IsReserve {
-				if err := IpTablesSwitchReserve(); err != nil {
+				if err := m.IpTablesSwitchReserve(); err != nil {
 					return fmt.Errorf("auto switch err: %w", err)
 				}
 				IsReserve = true
@@ -99,7 +103,7 @@ func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 		} else if rttCountInner < m.RttSettings && switchCount == 1 {
 			switchCount--
 			if !IsMain {
-				if err := IpTablesSwitchMain(); err != nil {
+				if err := m.IpTablesSwitchMain(); err != nil {
 					return fmt.Errorf("auto switch err: %w", err)
 				}
 				IsMain = true
@@ -109,7 +113,7 @@ func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 		if packetLOssInner > m.PacketLossSettings && switchCountPacket == 0 {
 			switchCountPacket++
 			if !IsReserve {
-				if err := IpTablesSwitchReserve(); err != nil {
+				if err := m.IpTablesSwitchReserve(); err != nil {
 					return fmt.Errorf("auto switch err: %w", err)
 				}
 				IsReserve = true
@@ -118,7 +122,7 @@ func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 		} else if packetLOssInner <= m.PacketLossSettings && switchCountPacket == 1 {
 			switchCountPacket--
 			if !IsMain {
-				if err := IpTablesSwitchMain(); err != nil {
+				if err := m.IpTablesSwitchMain(); err != nil {
 					return fmt.Errorf("auto switch err: %w", err)
 				}
 				IsMain = true
