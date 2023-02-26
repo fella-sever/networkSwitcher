@@ -154,16 +154,25 @@ func main() {
 					fmt.Println("autoSwitch err: ", err)
 				}
 			case "reserve":
+
 				log.Info("user switched to reserve")
 				err := set.IpTablesSwitchReserve()
 				if err != nil {
 					fmt.Println("switch to reserve iptables mode err: ", err)
+				}
+				for set.NetworkSwitchMode == "reserve" {
+					<-rttCurrent
+					<-packetLossCurrent
 				}
 			case "main":
 				log.Info("user switched to main")
 				err := set.IpTablesSwitchMain()
 				if err != nil {
 					fmt.Println("switch to reserve iptables mode err: ", err)
+				}
+				for set.NetworkSwitchMode == "main" {
+					<-rttCurrent
+					<-packetLossCurrent
 				}
 			}
 		}
