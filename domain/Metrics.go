@@ -3,7 +3,6 @@ package domain
 import (
 	"fmt"
 	"net"
-	"time"
 )
 
 type MetricsCount struct {
@@ -19,22 +18,19 @@ type MetricsCount struct {
 	NetworkSwitchMode   string  `json:"network_switch_mode"`          // настройки режима переключения сети
 }
 
-type MetricsSetDto struct {
+type MetricsUserSetDto struct {
 	RttSettings    float64 `json:"rtt_settings_ms" validate:"required"`
 	PacketLoss     float64 `json:"packet_loss_percent" validate:"required"`
 	PingerCount    int     `json:"pinger_count"`
 	PingerInterval int64   `json:"pinger_interval_ms" validate:"numeric"`
 }
-type NetworkSwitchSettingsDTO struct {
+type NetworkSwitchSettingsUserSetDTO struct {
 	NetworkSwitchMode string `json:"network_switch_mode" validate:"eq=main|eq=auto|eq=reserve,required"`
 }
 
-func (m *MetricsCount) CheckPacketLossRttThreshold(rtt chan time.Duration,
-	packetLoss chan float64, swCount *int) error {
-
-	return nil
-}
-
+// CheckInterfaceIsAlive
+// проверка наличия сетевого интерфейса в системе. (для наглядности я буду
+// переименовывать интерфейсы в main - основная сеть и reserve - сеть свистка)
 func (m *MetricsCount) CheckInterfaceIsAlive(interfaceName string) error {
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -54,23 +50,37 @@ func (m *MetricsCount) CheckInterfaceIsAlive(interfaceName string) error {
 	return nil
 }
 
+// IpTablesSwitchMain
+// запуск заранее подготовленного скрипта для очистки таблиц маршрутизации и
+// загрузки новых под основную сеть
 func IpTablesSwitchMain() error {
+	// TODO implement me!
 	fmt.Println("switched to main")
 	return nil
 }
 
-func IpTablesSwitchReseve() error {
+// IpTablesSwitchReserve
+// запуск заранее подготовленного скрипта для очистки таблиц маршрутизации и
+// загрузки новых под резервную сеть
+func IpTablesSwitchReserve() error {
+	// TODO implement me!
 	fmt.Println("switched to reserve")
 	return nil
 }
 
+// NetworkAutoSwitch
+// метод для автоматического переключения сети в зависимости от метрик ртт и потери
+// пакетов. Принимает на вход метрики через два канала синхронизатора, считывание
+// из которых, во-первых, служит как тормоз для суперцикла,
+// во-вторых - передает внутрь информацию для работы алгоритма
 func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 	packetLossCount chan float64) error {
+	// семафоры-семафорчики для того, чтобы у нас не было кучи переключений, а так же
+	// двойного переключения сети в том случае, если у нас меняются сразу две метрики
 	switchCount := 1
 	switchCountPacket := 1
 	IsMain := false
 	IsReserve := false
-
 	for {
 		rttCountInner := <-rttCount
 		packetLOssInner := <-packetLossCount
@@ -80,7 +90,7 @@ func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 		if rttCountInner > m.RttSettings && switchCount == 0 {
 			switchCount++
 			if !IsReserve {
-				if err := IpTablesSwitchReseve(); err != nil {
+				if err := IpTablesSwitchReserve(); err != nil {
 					return fmt.Errorf("auto switch err: %w", err)
 				}
 				IsReserve = true
@@ -99,7 +109,7 @@ func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 		if packetLOssInner > m.PacketLossSettings && switchCountPacket == 0 {
 			switchCountPacket++
 			if !IsReserve {
-				if err := IpTablesSwitchReseve(); err != nil {
+				if err := IpTablesSwitchReserve(); err != nil {
 					return fmt.Errorf("auto switch err: %w", err)
 				}
 				IsReserve = true

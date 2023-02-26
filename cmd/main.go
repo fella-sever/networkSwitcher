@@ -14,10 +14,19 @@ import (
 )
 
 func main() {
+	// переключалка сети - устанавливает режим работы свитчера в зависимости от того
+	// что выбрал пользователь в эндпоинте. Ниже по дефолту в канал пишется "auto"
+	// для работы свитчера в режиме авто по умолчанию
 	networkModeChan := make(chan string, 2)
-	rttCurrent := make(chan float64)
-	packetLossCurrent := make(chan float64)
-	// начальная проверка интерфейсов
+	// синхронизаторы служат для торможения и синхронизации суперцикла в рутине
+	// переключения сети в автоматическом режиме. В случае неиспользования суперцикл
+	// в рутине гонит со страшной скоростью, забирая на себя все вычсилительные
+	// ресурсы ядра
+	rttCurrent := make(chan float64)        // синхронизатор по ртт
+	packetLossCurrent := make(chan float64) // синхронизатор по потере пакетов
+
+	// начальная проверка интерфейсов на доступность их в системе. Если основной интер
+	// фейл недоступен, то происходит свитч на резерв
 	var set domain.MetricsCount
 	interfaceErr := set.CheckInterfaceIsAlive("main")
 	if interfaceErr != nil {
@@ -27,7 +36,7 @@ func main() {
 	if interfaceErr != nil {
 		log.Println("check interfacres: ", interfaceErr)
 	}
-	// валидатор для роутов
+	// валидатор для роутов, конкретнее для валидации поля выбора режима работы сети
 	validate := validator.New()
 	// дефолтное значение параметров запуска утилиты
 	set.RttSettings = 100          // предел задержки по сети
@@ -38,14 +47,19 @@ func main() {
 	networkModeChan <- "auto"
 	wg := sync.WaitGroup{}
 	wg.Add(4)
+	// запуск сервера
 	r := gin.Default()
-	// запск сервера
 	go func() {
+		// роут для получения пользователем информации о системе и насройках
 		r.GET("/get_info", func(c *gin.Context) {
 			c.JSON(http.StatusOK, set)
 		})
+		// роут для установки пороговых значений ртт и потери пакетов
+		// для установки режимов пинга
+		// TODO пока еще не прокинул настройки пинга в функцию самого пинга
+		// надо доделать
 		r.POST("/set_threshold", func(c *gin.Context) {
-			var newSettings domain.MetricsSetDto
+			var newSettings domain.MetricsUserSetDto
 			if err := c.BindJSON(&newSettings); err != nil {
 				return
 			}
@@ -57,8 +71,9 @@ func main() {
 			c.IndentedJSON(http.StatusCreated, set)
 
 		})
+		// выбор режима сети
 		r.POST("/set_network_mode", func(c *gin.Context) {
-			var networkSwitchMode domain.NetworkSwitchSettingsDTO
+			var networkSwitchMode domain.NetworkSwitchSettingsUserSetDTO
 			if err := c.BindJSON(&networkSwitchMode); err != nil {
 				return
 			}
@@ -73,7 +88,10 @@ func main() {
 			}
 
 		})
-		r.Run()
+		err := r.Run()
+		if err != nil {
+			log.Panicf("failed to start server: %s", err)
+		}
 		wg.Done()
 	}()
 	//запуск сканирования состояния сети
@@ -98,14 +116,13 @@ func main() {
 			if err != nil {
 				fmt.Println(lossErr)
 			}
-
 			set.Rtt = finalRtt
 			set.PacketLoss = finalPacketLoss * 10
 			rttCurrent <- finalRtt
 			packetLossCurrent <- finalPacketLoss * 10
 
 		}
-		wg.Done()
+		//wg.Done()
 	}()
 	// переключатель режима сети
 	go func() {
@@ -117,7 +134,7 @@ func main() {
 					fmt.Println("autoSwitch err: ", err)
 				}
 			case "reserve":
-				err := domain.IpTablesSwitchReseve()
+				err := domain.IpTablesSwitchReserve()
 				if err != nil {
 					fmt.Println("switch to reserve iptables mode err: ", err)
 				}
