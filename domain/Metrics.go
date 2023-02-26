@@ -67,25 +67,54 @@ func IpTablesSwitchReseve() error {
 func (m *MetricsCount) NetworkAutoSwitch(rttCount chan float64,
 	packetLossCount chan float64) error {
 	switchCount := 1
+	switchCountPacket := 1
+	IsMain := false
+	IsReserve := false
 
 	for {
 		rttCountInner := <-rttCount
-		<-packetLossCount
+		packetLOssInner := <-packetLossCount
 		if m.NetworkSwitchMode != "auto" {
 			break
 		}
 		if rttCountInner > m.RttSettings && switchCount == 0 {
 			switchCount++
-			if err := IpTablesSwitchReseve(); err != nil {
-				return fmt.Errorf("auto switch err: %w", err)
+			if !IsReserve {
+				if err := IpTablesSwitchReseve(); err != nil {
+					return fmt.Errorf("auto switch err: %w", err)
+				}
+				IsReserve = true
+				IsMain = false
 			}
 		} else if rttCountInner < m.RttSettings && switchCount == 1 {
 			switchCount--
-			if err := IpTablesSwitchMain(); err != nil {
-				return fmt.Errorf("auto switch err: %w", err)
+			if !IsMain {
+				if err := IpTablesSwitchMain(); err != nil {
+					return fmt.Errorf("auto switch err: %w", err)
+				}
+				IsMain = true
+				IsReserve = false
+			}
+		}
+		if packetLOssInner > m.PacketLossSettings && switchCountPacket == 0 {
+			switchCountPacket++
+			if !IsReserve {
+				if err := IpTablesSwitchReseve(); err != nil {
+					return fmt.Errorf("auto switch err: %w", err)
+				}
+				IsReserve = true
+				IsMain = false
+			}
+		} else if packetLOssInner <= m.PacketLossSettings && switchCountPacket == 1 {
+			switchCountPacket--
+			if !IsMain {
+				if err := IpTablesSwitchMain(); err != nil {
+					return fmt.Errorf("auto switch err: %w", err)
+				}
+				IsMain = true
+				IsReserve = false
 			}
 		}
 	}
-
 	return nil
 }
