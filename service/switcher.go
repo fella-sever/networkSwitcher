@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"networkSwitcher/domain"
+	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -16,8 +17,16 @@ import (
 )
 
 func StartService() error {
+	logErr := InitLogToFile()
+	if logErr != nil {
+		return fmt.Errorf("while creating config file: %w", logErr)
+	}
 	PingToSwitch := make(chan struct{})
 	var set domain.MetricsCount
+	err := set.IPTablesSetupInteface()
+	if err != nil {
+		fmt.Println(err)
+	}
 	validate := validator.New()
 	// дефолтное значение параметров запуска утилиты
 	set.RttSettings = 100          // предел задержки по сети
@@ -100,22 +109,25 @@ func NetworkScan(PingToSwitch chan struct{}, set *domain.MetricsCount) error {
 			ping, err := exec.Command("ping", "-i 0.2",
 				"-c 10", "8.8.8.8").Output()
 			if err != nil {
-				fmt.Println(err)
+				log.Println("while pinging: ", err)
 			}
 			stringPing := string(ping)
 			packetLoss := strings.Split(stringPing, "\n")
 			rttRow := packetLoss[len(packetLoss)-2]
 			packetLossRow := packetLoss[len(packetLoss)-3]
-			splittedRttRow := strings.Split(rttRow, "/")
 			splittedPacketLossRow := strings.Split(packetLossRow, ",")
-			finalRtt, err := strconv.ParseFloat(splittedRttRow[4], 64)
-			if err != nil {
-				fmt.Println(err)
-			}
 			finalPacketLoss, lossErr := strconv.ParseFloat(string(
 				splittedPacketLossRow[2][1]), 64)
 			if err != nil {
-				fmt.Println(lossErr)
+				log.Println(lossErr)
+			}
+
+			splittedRttRow := strings.Split(rttRow, "/")
+			parseRtt := splittedRttRow[3]
+			tt := strings.Split(parseRtt, " ")
+			finalRtt, err := strconv.ParseFloat(tt[2], 64)
+			if err != nil {
+				log.Println(err)
 			}
 			set.Rtt = finalRtt
 			set.PacketLoss = finalPacketLoss * 10
@@ -137,7 +149,7 @@ func Switch(PingToSwitch chan struct{}, set *domain.MetricsCount) error {
 					log.Println(err)
 				}
 
-				fmt.Println("switched to auto")
+				log.Println("switched to auto")
 				auto = true
 				mainn = false
 				reserve = false
@@ -155,7 +167,7 @@ func Switch(PingToSwitch chan struct{}, set *domain.MetricsCount) error {
 			}
 			if set.NetworkSwitchMode == "main" && !mainn {
 				if err := set.IpTablesSwitchMain(); err != nil {
-					fmt.Println(err)
+					log.Println(err)
 				}
 				auto = false
 				reserve = false
@@ -208,3 +220,15 @@ func Switch(PingToSwitch chan struct{}, set *domain.MetricsCount) error {
 //}()
 //
 //wg.Wait()
+
+func InitLogToFile() error {
+	logFile, createErr := os.OpenFile("NSlogfile.txt", os.O_RDWR|os.O_CREATE|
+		os.O_CREATE, 0666)
+	if createErr != nil {
+		log.Println("cannot create lofFile: ", createErr)
+	}
+	log.SetOutput(logFile)
+	defer logFile.Close()
+
+	return nil
+}

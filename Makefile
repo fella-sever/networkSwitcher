@@ -15,5 +15,5 @@ build:
 local:
 
 	@echo "transmitting to arm..."
-	scp -P 2125 netSwitcher embedded_orange@192.168.0.5:/home/embedded_orange
+	scp -P 2125 netSwitcher orange@192.168.0.5:/home/orange
 	@echo "transmitted"

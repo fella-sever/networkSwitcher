@@ -3,7 +3,6 @@ package domain
 import (
 	"fmt"
 	"log"
-	"os/exec"
 )
 
 type MetricsCount struct {
@@ -35,7 +34,6 @@ func (m *MetricsCount) AutoNetwork(ch chan struct{}) error {
 	IsReserve := false
 	for m.NetworkSwitchMode == "auto" {
 		<-ch
-		fmt.Println("inner auto")
 
 		if m.Rtt > m.RttSettings && switchCount == 0 {
 			switchCount++
@@ -86,14 +84,21 @@ func (m *MetricsCount) AutoNetwork(ch chan struct{}) error {
 // загрузки новых под основную сеть
 func (m *MetricsCount) IpTablesSwitchMain() error {
 	log.Println("main")
-	_, err := exec.Command("ifconfig", "main", "up").Output()
-	if err != nil {
-		return err
-	}
-	_, err = exec.Command("ifconfig", "reserve", "down").Output()
-	if err != nil {
-		return err
-	}
+	////iptables --table nat --append POSTROUTING --out-interface eth0 -j MASQUERADE
+	//_, mainResErr := exec.Command("iptables",
+	//	"--table", "nat", "--append", "POSTROUTING",
+	//	"--out-interface", "eth0", "-j", "MASQUERADE").
+	//	Output()
+	//if mainResErr != nil {
+	//	log.Println("while switching to main network: ", mainResErr)
+	//}
+	//_, resNetErr := exec.Command("iptables",
+	//	"--table", "nat", "--delete", "POSTROUTING",
+	//	"--out-interface", "wan0", "-j", "MASQUERADE").
+	//	Output()
+	//if resNetErr != nil {
+	//	log.Println("while switching to main network: ", mainResErr)
+	//}
 
 	return nil
 }
@@ -102,14 +107,29 @@ func (m *MetricsCount) IpTablesSwitchMain() error {
 // запуск заранее подготовленного скрипта для очистки таблиц маршрутизации и
 // загрузки новых под резервную сеть
 func (m *MetricsCount) IpTablesSwitchReserve() error {
-	_, err := exec.Command("ifconfig", "reserve", "up").Output()
-	if err != nil {
-		return err
-	}
-	_, err = exec.Command("ifconfig", "main", "down").Output()
-	if err != nil {
-		return err
-	}
 	log.Println("reserve")
+	//_, resNetErr := exec.Command("iptables",
+	//	"--table", "nat", "--append", "POSTROUTING",
+	//	"--out-interface", "wan0", "-j", "MASQUERADE").
+	//	Output()
+	//if resNetErr != nil {
+	//	log.Println("reserve switch to reserve:", resNetErr)
+	//}
+	//_, mainNetErr := exec.Command("iptables",
+	//	"--table", "nat", "--delete", "POSTROUTING",
+	//	"--out-interface", "eth0", "-j", "MASQUERADE").
+	//	Output()
+	//if mainNetErr != nil {
+	//	return fmt.Errorf("while switching to reserve network: %w", mainNetErr)
+	//}
+	return nil
+}
+
+func (m *MetricsCount) IPTablesSetupInteface() error {
+	//_, err := exec.Command("iptables",
+	//	"--append", "FORWARD", "--in-interface", "eth1", "-j", "ACCEPT").Output()
+	//if err != nil {
+	//	return fmt.Errorf("while setup lan0 interface %w", err)
+	//}
 	return nil
 }
