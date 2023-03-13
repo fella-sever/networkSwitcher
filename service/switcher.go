@@ -1,14 +1,12 @@
 package service
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"log"
 	"net"
 	"net/http"
 	"networkSwitcher/domain"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -17,16 +15,8 @@ import (
 )
 
 func StartService() error {
-	logErr := InitLogToFile()
-	if logErr != nil {
-		return fmt.Errorf("while creating config file: %w", logErr)
-	}
 	PingToSwitch := make(chan struct{})
 	var set domain.MetricsCount
-	err := set.IPTablesSetupInteface()
-	if err != nil {
-		fmt.Println(err)
-	}
 	validate := validator.New()
 	// дефолтное значение параметров запуска утилиты
 	set.RttSettings = 100          // предел задержки по сети
@@ -179,56 +169,5 @@ func Switch(PingToSwitch chan struct{}, set *domain.MetricsCount) error {
 			<-PingToSwitch
 		}
 	}()
-	return nil
-}
-
-//
-//go func() {
-//	auto := false
-//	mainn := false
-//	reserve := false
-//	for {
-//		if set.NetworkSwitchMode == "auto" && !auto {
-//
-//			set.AutoNetwork(PingToSwitch)
-//
-//			fmt.Println("switched to auto")
-//			auto = true
-//			mainn = false
-//			reserve = false
-//		}
-//		if set.NetworkSwitchMode == "reserve" && !reserve {
-//			set.IpTablesSwitchReserve()
-//			auto = false
-//			mainn = false
-//			reserve = true
-//			for set.NetworkSwitchMode == "reserve" {
-//				<-PingToSwitch
-//			}
-//		}
-//		if set.NetworkSwitchMode == "main" && !mainn {
-//			set.IpTablesSwitchMain()
-//			auto = false
-//			reserve = false
-//			mainn = true
-//			for set.NetworkSwitchMode == "main" {
-//				<-PingToSwitch
-//			}
-//		}
-//		<-PingToSwitch
-//	}
-//}()
-//
-//wg.Wait()
-
-func InitLogToFile() error {
-	logFile, createErr := os.OpenFile("NSlogfile.txt", os.O_RDWR|os.O_CREATE|
-		os.O_CREATE, 0666)
-	if createErr != nil {
-		log.Println("cannot create lofFile: ", createErr)
-	}
-	log.SetOutput(logFile)
-	defer logFile.Close()
-
 	return nil
 }
